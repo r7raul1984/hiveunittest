@@ -14,6 +14,9 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+
 /*
     This example is intended to be a small show case for some of the ways of setting up your test data in HiveRunner.
     It will only print out some result and thus is not a strict unit test suite.
@@ -38,8 +41,50 @@ public class InsertTestData {
                 .append("col_a STRING, col_b INT, col_c BOOLEAN")
                 .append(")")
                 .toString());
+        shell.execute(new StringBuilder()
+                .append("CREATE TABLE `source_db.test_data`(")
+                .append(" `test_version` string, \n" +
+                        "  `id` string \n"
+                )
+                .append(")PARTITIONED BY ( \n" +
+                        "  `date` string, \n" +
+                        "  `hour` string)\n" +
+                        "  stored as orc  ")
+                .toString());
+        shell.execute(new StringBuilder()
+                .append("  CREATE TABLE `source_db.test_log`(")
+                .append(" `test_version` string, \n" +
+                        " `exp_list` string, \n" +
+                        "  `id` string \n"
+                )
+                .append(")" +
+                        "  stored as orc  ")
+                .toString());
+
     }
 
+    @Test
+    public void insertRowsFromCsvFile() {
+        File dataFile = new File("src/test/resources/examples/test_data.csv");
+        shell.insertInto("source_db", "test_data")
+                .withAllColumns()
+                .addRowsFrom(dataFile, new TsvFileParser().withHeader().withDelimiter(",").withNullValue("NULL"))
+                .commit();
+
+        File logFile = new File("src/test/resources/examples/test_log.csv");
+        shell.insertInto("source_db", "test_log")
+                .withAllColumns()
+                .addRowsFrom(logFile, new TsvFileParser().withHeader().withDelimiter(",").withNullValue("NULL"))
+                .commit();
+
+        List<Object[]> result = shell.executeStatement("select * from source_db.test_data a " +
+                "left join ( select test_version,id,exp_list from source_db.test_log group by test_version,id,exp_list) b on a.id=b.id and a.test_version =b.test_version");
+        printResult(result);
+        assertEquals(2, result.size());
+
+        assertArrayEquals(new Object[]{null, null, "2018-11-19", "00", null, null, null}, result.get(0));
+        assertArrayEquals(new Object[]{"1_3", "jj3fa4e5c0f24", "2018-11-19", "00", "1_3", "jj3fa4e5c0f24", "1:1;2:6;3:8"}, result.get(1));
+    }
 
     @Test
     public void insertRowsFromCode() {
@@ -121,7 +166,7 @@ public class InsertTestData {
 
 
     public void printResult(List<Object[]> result) {
-        System.out.println(String.format("Result from %s:",name.getMethodName()));
+        System.out.println(String.format("Result from %s:", name.getMethodName()));
         for (Object[] row : result) {
             System.out.println(Arrays.asList(row));
         }
