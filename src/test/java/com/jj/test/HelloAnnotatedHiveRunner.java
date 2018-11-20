@@ -118,9 +118,9 @@ public class HelloAnnotatedHiveRunner {
 
     @Test
     public void testSelectFromCtas() {
-        HashSet<String> expected = Sets.newHashSet("Hello", "World", "!");
+        HashSet<String> expected = Sets.newHashSet("Hellojj", "World", "!");
         HashSet<String> actual = Sets.newHashSet(hiveShell
-                .executeQuery("select a.s from (select s, i from foo_prim order by i) a where a.i is not null"));
+                .executeQuery("select a.s from (select clean(s) as s, i from foo_prim order by i) a where a.i is not null"));
         Assert.assertEquals(expected, actual);
     }
 
